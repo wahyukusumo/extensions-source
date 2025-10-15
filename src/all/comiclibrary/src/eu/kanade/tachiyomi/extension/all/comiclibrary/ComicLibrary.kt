@@ -30,8 +30,9 @@ class ComicLibrary : HttpSource() {
     override fun popularMangaParse(response: Response): MangasPage {
         val body = response.body.string()
         val json = JSONObject(body)
+        val data = json.getJSONObject("data")
 
-        val mangas = json.getJSONArray("results").let { array ->
+        val mangas = data.getJSONArray("results").let { array ->
             (0 until array.length()).map { i ->
                 SManga.create().apply {
                     val obj = array.getJSONObject(i)
@@ -42,7 +43,10 @@ class ComicLibrary : HttpSource() {
             }
         }
 
-        val next = json.opt("next")
+        val meta = data.getJSONObject("meta")
+        val pagination = meta.getJSONObject("pagination")
+        val next = pagination.opt("next")
+
         val hasNextPage = next != null && next.toString() != "null"
         return MangasPage(mangas, hasNextPage)
     }
@@ -72,7 +76,7 @@ class ComicLibrary : HttpSource() {
 
     override fun mangaDetailsParse(response: Response): SManga {
         val root = JSONObject(response.body.string())
-        val obj = root.getJSONObject("book")
+        val obj = root.getJSONObject("data")
 
         return SManga.create().apply {
             title = obj.getString("en_title")
@@ -92,7 +96,7 @@ class ComicLibrary : HttpSource() {
 
     override fun chapterListParse(response: Response): List<SChapter> {
         val root = JSONObject(response.body.string())
-        val obj = root.getJSONObject("book")
+        val obj = root.getJSONObject("data")
         return listOf(
             SChapter.create().apply {
                 name = "Chapter"
@@ -104,7 +108,7 @@ class ComicLibrary : HttpSource() {
 
     override fun pageListParse(response: Response): List<Page> {
         val root = JSONObject(response.body.string())
-        val obj = root.getJSONObject("book")
+        val obj = root.getJSONObject("data")
 
         val id = obj.getString("id")
         val pages = obj.getInt("pages")
