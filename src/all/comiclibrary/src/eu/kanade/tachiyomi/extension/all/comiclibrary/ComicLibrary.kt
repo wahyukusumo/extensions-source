@@ -80,7 +80,16 @@ class ComicLibrary : HttpSource() {
             else -> "books"
         }
 
-        val url = "$baseUrl/$sortPath?q=$query&page=$page"
+        val url = if (query.isNotBlank()) {
+            // 👇 Use search endpoint when user types something
+            "$baseUrl/books?q=$query&page=$page"
+        } else {
+            // 👇 Use tab path when no search
+            "$baseUrl/$sortPath?page=$page"
+        }
+
+        // val url = "$baseUrl/$sortPath?q=$query&page=$page"
+
         return GET(url)
     }
 
