@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.commaSeparatedStri
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.epochTime
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.getTagDescription
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
@@ -37,8 +38,13 @@ class ComicLibrary : HttpSource() {
                 SManga.create().apply {
                     val obj = array.getJSONObject(i)
                     title = obj.getString("en_title")
-                    url = "/book/${obj.getString("id")}"
-                    thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
+                    if (obj.has("id")) {
+                        url = "/book/${obj.getString("id")}"
+                        thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
+                    } else {
+                        url = "/comic/$title"
+                        thumbnail_url = "$baseUrl/cdn/$title/cover.jpg"
+                    }
                 }
             }
         }
@@ -61,8 +67,21 @@ class ComicLibrary : HttpSource() {
     }
 
     // Search
+    // override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+    //     return GET("$baseUrl/books?q=$query&page=$page")
+    // }
+
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        return GET("$baseUrl/books?q=$query&page=$page")
+        val sortFilter = filters.findInstance<SortFilter>()
+
+        val sortPath = when (sortFilter?.toUriPart()) {
+            "comics" -> "comics"
+            "favourites" -> "books/favorites"
+            else -> "books"
+        }
+
+        val url = "$baseUrl/$sortPath?q=$query&page=$page"
+        return GET(url)
     }
 
     override fun searchMangaParse(response: Response): MangasPage {
@@ -84,7 +103,11 @@ class ComicLibrary : HttpSource() {
             author = commaSeparatedString(obj.getJSONArray("groups")) ?: commaSeparatedString(obj.getJSONArray("artists"))
             description = getTagDescription(obj)
             status = SManga.COMPLETED
-            thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
+            if (obj.has("id")) {
+                thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
+            } else {
+                thumbnail_url = "$baseUrl/cdn/$title/cover.jpg"
+            }
             genre = commaSeparatedString(obj.getJSONArray("tags"))
         }
     }
@@ -110,7 +133,8 @@ class ComicLibrary : HttpSource() {
         val root = JSONObject(response.body.string())
         val obj = root.getJSONObject("data")
 
-        val id = obj.getString("id")
+        // val id = obj.getString("id")
+        val id = obj.optString("id").ifEmpty { obj.optString("en_title") }
         val pages = obj.getInt("pages")
 
         return (1..pages).map { page ->
@@ -121,5 +145,27 @@ class ComicLibrary : HttpSource() {
     override fun imageUrlParse(response: Response): String {
         // Not used, since we already return image URLs in pageListParse
         throw UnsupportedOperationException("Not used")
+    }
+
+    private class SortFilter : UriPartFilter(
+        "Choose Source",
+        arrayOf(
+            "Comics" to "comics",
+            "Favourites" to "favourites",
+        ),
+    )
+
+    override fun getFilterList() = FilterList(listOf(SortFilter()))
+
+    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
+
+    private open class UriPartFilter(
+        displayName: String,
+        val vals: Array<Pair<String, String>>,
+    ) : Filter.Select<String>(
+        displayName,
+        vals.map { it.first }.toTypedArray(),
+    ) {
+        fun toUriPart() = vals[state].second
     }
 }
