@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.extension.all.comiclibrary
 
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.commaSeparatedString
+import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.encodeURIComponent
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.epochTime
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.getTagDescription
 import eu.kanade.tachiyomi.network.GET
@@ -37,13 +38,14 @@ class ComicLibrary : HttpSource() {
             (0 until array.length()).map { i ->
                 SManga.create().apply {
                     val obj = array.getJSONObject(i)
-                    title = obj.getString("en_title")
-                    if (obj.has("id")) {
-                        url = "/book/${obj.getString("id")}"
-                        thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
+                    title = obj.optString("filename", obj.optString("en_title"))
+                    val book_id = obj.optString("filename", obj.optString("id"))
+                    val encode_book_id = encodeURIComponent(book_id)
+                    thumbnail_url = "$baseUrl/cdn/$encode_book_id/cover.jpg"
+                    if (obj.has("filename")) {
+                        url = "/comic/$encode_book_id"
                     } else {
-                        url = "/comic/$title"
-                        thumbnail_url = "$baseUrl/cdn/$title/cover.jpg"
+                        url = "/book/$book_id"
                     }
                 }
             }
@@ -75,8 +77,10 @@ class ComicLibrary : HttpSource() {
         val sortFilter = filters.findInstance<SortFilter>()
 
         val sortPath = when (sortFilter?.toUriPart()) {
+            "books" -> "books"
+            "favourite books" -> "books/favorites"
             "comics" -> "comics"
-            "favourites" -> "books/favorites"
+            "favourite comics" -> "comics/favorites"
             else -> "books"
         }
 
@@ -107,17 +111,15 @@ class ComicLibrary : HttpSource() {
         val obj = root.getJSONObject("data")
 
         return SManga.create().apply {
-            title = obj.getString("en_title")
+            title = obj.optString("filename", obj.optString("en_title"))
             artist = commaSeparatedString(obj.getJSONArray("artists"))
-            author = commaSeparatedString(obj.getJSONArray("groups")) ?: commaSeparatedString(obj.getJSONArray("artists"))
+            author = obj.optJSONArray("groups")?.let { commaSeparatedString(it) } ?: obj.optJSONArray("artists")?.let { commaSeparatedString(it) }
             description = getTagDescription(obj)
+            val book_id = obj.optString("filename", obj.getString("id"))
+            val encode_book_id = encodeURIComponent(book_id)
             status = SManga.COMPLETED
-            if (obj.has("id")) {
-                thumbnail_url = "$baseUrl/cdn/${obj.getString("id")}/cover.jpg"
-            } else {
-                thumbnail_url = "$baseUrl/cdn/$title/cover.jpg"
-            }
-            genre = commaSeparatedString(obj.getJSONArray("tags"))
+            thumbnail_url = "$baseUrl/cdn/$encode_book_id/cover.jpg"
+            genre = commaSeparatedString(obj.optJSONArray("tags"))
         }
     }
 
@@ -132,7 +134,9 @@ class ComicLibrary : HttpSource() {
         return listOf(
             SChapter.create().apply {
                 name = "Chapter"
-                date_upload = epochTime(obj.optString("uploaded"))
+                val uploadedStr = obj.optString("uploaded")
+                val publishedEpoch = obj.optLong("published") * 1000 // convert sec → ms
+                date_upload = uploadedStr.takeIf { it.isNotEmpty() }?.let { epochTime(it) } ?: publishedEpoch
                 setUrlWithoutDomain(response.request.url.encodedPath)
             },
         )
@@ -143,11 +147,12 @@ class ComicLibrary : HttpSource() {
         val obj = root.getJSONObject("data")
 
         // val id = obj.getString("id")
-        val id = obj.optString("id").ifEmpty { obj.optString("en_title") }
+        val book_id = obj.optString("filename", obj.optString("id"))
+        val encode_book_id = encodeURIComponent(book_id)
         val pages = obj.getInt("pages")
 
         return (1..pages).map { page ->
-            Page(page - 1, "", "$baseUrl/serve-image/$id/$page")
+            Page(page - 1, "", "$baseUrl/serve-image/$encode_book_id/$page")
         }
     }
 
@@ -159,8 +164,10 @@ class ComicLibrary : HttpSource() {
     private class SortFilter : UriPartFilter(
         "Choose Source",
         arrayOf(
+            "Books" to "books",
+            "Favourite Books" to "favourite books",
             "Comics" to "comics",
-            "Favourites" to "favourites",
+            "Favourite Comics" to "favourite comics",
         ),
     )
 

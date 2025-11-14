@@ -2,10 +2,20 @@ package eu.kanade.tachiyomi.extension.all.comiclibrary
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 object CLUtils {
+    fun encodeURIComponent(s: String): String =
+        URLEncoder.encode(s, "UTF-8")
+            .replace("+", "%20")
+            .replace("%21", "!")
+            .replace("%27", "'")
+            .replace("%28", "(")
+            .replace("%29", ")")
+            .replace("%7E", "~")
+
     fun epochTime(dateStr: String): Long {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssxxx")
         val odt = OffsetDateTime.parse(dateStr, formatter)
