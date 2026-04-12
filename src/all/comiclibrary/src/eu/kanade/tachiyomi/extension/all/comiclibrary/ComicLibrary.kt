@@ -133,11 +133,15 @@ class ComicLibrary : HttpSource() {
         val obj = root.getJSONObject("data")
         return listOf(
             SChapter.create().apply {
-                name = "Chapter"
                 val uploadedStr = obj.optString("uploaded")
                 val publishedEpoch = obj.optLong("published") * 1000 // convert sec → ms
                 date_upload = uploadedStr.takeIf { it.isNotEmpty() }?.let { epochTime(it) } ?: publishedEpoch
-                setUrlWithoutDomain(response.request.url.encodedPath)
+                val book_id = obj.optString("filename", obj.optString("id"))
+                val encode_book_id = encodeURIComponent(book_id)
+                val segment = response.request.url.pathSegments.first()
+                url = "/$segment/$encode_book_id"
+                name = "Chapter"
+                // setUrlWithoutDomain(response.request.url.encodedPath)
             },
         )
     }

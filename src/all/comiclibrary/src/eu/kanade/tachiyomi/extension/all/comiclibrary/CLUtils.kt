@@ -27,21 +27,27 @@ object CLUtils {
     }
 
     fun getTagDescription(data: JSONObject): String {
+        val stringFields = linkedMapOf(
+            "description" to null,
+            "pages" to "Pages",
+            "categories" to "Categories",
+        )
+        val arrayFields = linkedMapOf(
+            "characters" to "Characters",
+            "parodies" to "Parodies",
+            "languages" to "Languages",
+        )
         return buildString {
-            // categories is just a string
-            data.optString("categories")
-                .takeIf { it.isNotBlank() }
-                ?.let { append("Categories: $it\n") }
-
-            // parodies is a JSONArray
-            data.optJSONArray("parodies")
-                ?.takeIf { it.length() > 0 }
-                ?.let { append("Parodies: ${commaSeparatedString(it)}\n") }
-
-            // characters is a JSONArray
-            data.optJSONArray("characters")
-                ?.takeIf { it.length() > 0 }
-                ?.let { append("Characters: ${commaSeparatedString(it)}\n\n") }
+            stringFields.forEach { (key, label) ->
+                data.optString(key)
+                    .takeIf { it.isNotBlank() }
+                    ?.let { append(if (label != null) "$label: $it\n" else "$it\n") }
+            }
+            arrayFields.forEach { (key, label) ->
+                data.optJSONArray(key)
+                    ?.takeIf { it.length() > 0 }
+                    ?.let { append("$label: ${commaSeparatedString(it)}\n") }
+            }
         }
     }
 }
