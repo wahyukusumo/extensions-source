@@ -2,7 +2,6 @@ package eu.kanade.tachiyomi.extension.all.comiclibrary
 
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.commaSeparatedString
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.encodeURIComponent
-import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.epochTime
 import eu.kanade.tachiyomi.extension.all.comiclibrary.CLUtils.getTagDescription
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.source.model.Filter
@@ -77,11 +76,12 @@ class ComicLibrary : HttpSource() {
         val sortFilter = filters.findInstance<SortFilter>()
 
         val sortPath = when (sortFilter?.toUriPart()) {
+            "merged" -> "merged-books"
             "books" -> "books"
             "favourite books" -> "books/favorites"
             "comics" -> "comics"
             "favourite comics" -> "comics/favorites"
-            else -> "books"
+            else -> "merged"
         }
 
         val url = if (query.isNotBlank()) {
@@ -133,9 +133,9 @@ class ComicLibrary : HttpSource() {
         val obj = root.getJSONObject("data")
         return listOf(
             SChapter.create().apply {
-                val uploadedStr = obj.optString("uploaded")
-                val publishedEpoch = obj.optLong("published") * 1000 // convert sec → ms
-                date_upload = uploadedStr.takeIf { it.isNotEmpty() }?.let { epochTime(it) } ?: publishedEpoch
+                val uploaded = obj.optLong("uploaded") * 1000
+                val published = obj.optLong("published") * 1000
+                date_upload = uploaded ?: published
                 val book_id = obj.optString("filename", obj.optString("id"))
                 val encode_book_id = encodeURIComponent(book_id)
                 val segment = response.request.url.pathSegments.first()
@@ -168,6 +168,7 @@ class ComicLibrary : HttpSource() {
     private class SortFilter : UriPartFilter(
         "Choose Source",
         arrayOf(
+            "Merged" to "merged",
             "Books" to "books",
             "Favourite Books" to "favourite books",
             "Comics" to "comics",
