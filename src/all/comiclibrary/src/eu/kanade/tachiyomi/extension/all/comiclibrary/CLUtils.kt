@@ -28,9 +28,12 @@ object CLUtils {
 
     fun getTagDescription(data: JSONObject): String {
         val stringFields = linkedMapOf(
-            "description" to null,
+            "magazine" to "Magazine",
+            "publisher" to "Publisher",
             "pages" to "Pages",
+            "favorites" to "Favorites",
             "categories" to "Categories",
+            "description" to null,
         )
         val arrayFields = linkedMapOf(
             "characters" to "Characters",
